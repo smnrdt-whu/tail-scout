@@ -16,6 +16,7 @@ import plotly.express as px
 import streamlit as st
 
 from src.agent import (
+    add_manual_supplier,
     advance_after_matching,
     advance_after_quotes,
     advance_after_send,
@@ -484,6 +485,34 @@ if nav == "Sourcing-Assistent":
             st.warning("Für echten Wettbewerb mindestens 2 Lieferanten auswählen.")
 
         st.markdown("---")
+        st.subheader("Manuell aus Lieferantendatenbank hinzufügen")
+        st.caption(
+            "Die Bedarfsperson kann bekannte Lieferanten zusätzlich zur "
+            "Agent-Empfehlung aufnehmen."
+        )
+        already_ids = {m.supplier.id for m in req.matches}
+        available = [s for s in st.session_state.suppliers if s.id not in already_ids]
+        if available:
+            options = {
+                f"{s.name} · {s.city} · {s.category}": s.id for s in available
+            }
+            pick_cols = st.columns((3, 1))
+            with pick_cols[0]:
+                chosen_label = st.selectbox(
+                    "Lieferant wählen",
+                    list(options.keys()),
+                    key=f"manual_supplier_{req.id}",
+                    label_visibility="collapsed",
+                )
+            with pick_cols[1]:
+                if st.button("Hinzufügen", use_container_width=True, key=f"add_sup_{req.id}"):
+                    supplier = next(s for s in available if s.id == options[chosen_label])
+                    add_manual_supplier(req, supplier)
+                    st.rerun()
+        else:
+            st.caption("Alle Lieferanten der Datenbank sind bereits gelistet.")
+
+        st.markdown("---")
         b1, b2, _ = st.columns((1, 1, 2))
         with b1:
             if st.button("Zurück"):
@@ -505,9 +534,9 @@ if nav == "Sourcing-Assistent":
     elif step == 2:
         st.markdown(
             '<div class="hitl-banner"><b>Demo – kein echter E-Mail-Versand:</b> '
-            "Entwürfe prüfen und freigeben, oder Freigabe überspringen und den "
-            "simulierten Versand später nachholen. Es verlassen keine Nachrichten "
-            "das System.</div>",
+            "Entwürfe prüfen und freigeben, oder Freigabe überspringen. "
+            "Beim Fortfahren werden Angebote nur simuliert – es verlassen keine "
+            "Nachrichten das System.</div>",
             unsafe_allow_html=True,
         )
 
@@ -531,6 +560,12 @@ if nav == "Sourcing-Assistent":
                     key=f"body_{req.id}_{email.supplier_id}",
                 )
 
+        def _simulate_quotes_and_compare() -> None:
+            selected_matches = [m for m in req.matches if m.selected]
+            req.quotes = simulate_quotes(req, selected_matches)
+            req.comparison = compare_quotes(req.quotes)
+            advance_after_quotes(req)
+
         st.markdown("---")
         b1, b2, b3 = st.columns(3)
         with b1:
@@ -552,6 +587,7 @@ if nav == "Sourcing-Assistent":
                     "Anfragen freigegeben und Versand simuliert (kein echter Versand).",
                 )
                 advance_after_send(req)
+                _simulate_quotes_and_compare()
                 st.session_state.wizard_step = 3
                 st.rerun()
         with b3:
@@ -570,116 +606,43 @@ if nav == "Sourcing-Assistent":
                 st.session_state.wizard_step = 3
                 st.rerun()
 
-    # ---- Step 3: Angebote ----
+    # ---- Step 3: Vergleich & Vergabe (HITL) ----
     elif step == 3:
-        st.markdown(
-            '<div class="agent-banner">In der Realität treffen PDF-Angebote per E-Mail ein. '
-            "Für die Demo simuliert der Agent realistische Angebote der kontaktierten "
-            "Lieferanten (Header + Positionen + Anfahrt). Es werden keine echten "
-            "E-Mails versendet.</div>",
-            unsafe_allow_html=True,
-        )
-
         any_sent = bool(req.emails) and any(e.sent for e in req.emails)
-        if not any_sent:
-            st.info(
-                "Anfragen sind noch nicht „versendet“. Der Versand ist nur simuliert "
-                "und dient der Demo – es geht keine E-Mail raus."
+
+        if not req.quotes:
+            st.markdown(
+                '<div class="agent-banner">Noch keine Angebote. In der Demo werden '
+                "Antworten der angefragten Lieferanten simuliert (kein echter "
+                "E-Mail-Versand).</div>",
+                unsafe_allow_html=True,
             )
-            if st.button("Anfragen simuliert versenden", type="primary", key="sim_send"):
+            if not any_sent:
+                st.info(
+                    "Anfragen sind noch nicht „versendet“. Mit dem Button unten "
+                    "werden Versand und Angebotseingang nur simuliert."
+                )
+            if st.button(
+                "Anfragen senden & Angebote einholen (Demo)",
+                type="primary",
+                key="sim_send_quotes",
+            ):
                 for e in req.emails:
                     e.sent = True
                 log_activity(
                     req,
-                    "Versand der Anfragen simuliert (kein echter E-Mail-Versand).",
+                    "Versand und Angebotseingang simuliert (kein echter E-Mail-Versand).",
                 )
                 advance_after_send(req)
-                st.rerun()
-        else:
-            sent_to = [e.supplier_name for e in req.emails if e.sent]
-            st.write("Anfragen (simuliert) gesendet an:", ", ".join(sent_to))
-
-        if not req.quotes:
-            if st.button(
-                "Angebote abrufen (Simulation)",
-                type="primary",
-                disabled=not any_sent,
-            ):
                 selected_matches = [m for m in req.matches if m.selected]
                 req.quotes = simulate_quotes(req, selected_matches)
                 req.comparison = compare_quotes(req.quotes)
                 advance_after_quotes(req)
                 st.rerun()
-        else:
-            st.success(f"{len(req.quotes)} Angebote eingegangen")
-            qdf = pd.DataFrame(
-                [
-                    {
-                        "Angebot": q.id,
-                        "Lieferant": q.supplier_name,
-                        "Gesamt": q.total,
-                        "Arbeit": q.labor_total,
-                        "Material": q.materials_total,
-                        "Anfahrt": q.travel_total,
-                        "Lieferzeit (Tage)": q.lead_time_days,
-                        "Stamm?": "Ja" if q.is_preferred_incumbent else "",
-                    }
-                    for q in req.quotes
-                ]
-            )
-            st.dataframe(
-                qdf,
-                use_container_width=True,
-                hide_index=True,
-                column_config={
-                    "Gesamt": st.column_config.NumberColumn(format="%.2f €"),
-                    "Arbeit": st.column_config.NumberColumn(format="%.2f €"),
-                    "Material": st.column_config.NumberColumn(format="%.2f €"),
-                    "Anfahrt": st.column_config.NumberColumn(format="%.2f €"),
-                },
-            )
 
-            with st.expander("Positionsdetails je Angebot"):
-                for q in req.quotes:
-                    st.markdown(f"**{q.supplier_name}** ({q.id})")
-                    st.dataframe(
-                        pd.DataFrame(
-                            [
-                                {
-                                    "Position": li.description,
-                                    "Menge": li.quantity,
-                                    "Einheit": li.unit,
-                                    "EP": li.unit_price,
-                                    "Gesamt": li.total,
-                                }
-                                for li in q.line_items
-                            ]
-                        ),
-                        use_container_width=True,
-                        hide_index=True,
-                    )
-                    st.caption(q.notes)
-
-        st.markdown("---")
-        b1, b2, _ = st.columns((1, 1, 2))
-        with b1:
-            if st.button("Zurück", key="back_step3"):
+            st.markdown("---")
+            if st.button("Zurück", key="back_step3_no_quotes"):
                 st.session_state.wizard_step = 2
-                st.rerun()
-        with b2:
-            if req.quotes and st.button("Zum Vergleich", type="primary"):
-                if not req.comparison:
-                    req.comparison = compare_quotes(req.quotes)
-                req.status = RequestStatus.AWAITING_AWARD
-                st.session_state.wizard_step = 4
-                st.rerun()
-
-    # ---- Step 4: Vergleich & Vergabe (HITL) ----
-    elif step == 4:
-        if not req.quotes:
-            st.warning("Noch keine Angebote – bitte einen Schritt zurück.")
-            if st.button("Zu Angebote"):
-                st.session_state.wizard_step = 3
                 st.rerun()
             st.stop()
 
@@ -750,6 +713,27 @@ if nav == "Sourcing-Assistent":
             hide_index=True,
         )
 
+        with st.expander("Angebotsdetails"):
+            for q in req.quotes:
+                st.markdown(f"**{q.supplier_name}** ({q.id}) – {fmt_eur(q.total)}")
+                st.dataframe(
+                    pd.DataFrame(
+                        [
+                            {
+                                "Position": li.description,
+                                "Menge": li.quantity,
+                                "Einheit": li.unit,
+                                "EP": li.unit_price,
+                                "Gesamt": li.total,
+                            }
+                            for li in q.line_items
+                        ]
+                    ),
+                    use_container_width=True,
+                    hide_index=True,
+                )
+                st.caption(q.notes)
+
         st.subheader("Vergabe")
         options = {f"{q.supplier_name} – {fmt_eur(q.total)} ({q.id})": q.id for q in req.quotes}
         default_label = next(
@@ -764,17 +748,17 @@ if nav == "Sourcing-Assistent":
         st.markdown("---")
         b1, b2, _ = st.columns((1, 1, 2))
         with b1:
-            if st.button("Zurück", key="back_step4"):
-                st.session_state.wizard_step = 3
+            if st.button("Zurück", key="back_step3"):
+                st.session_state.wizard_step = 2
                 st.rerun()
         with b2:
             if st.button("Vergabe bestätigen", type="primary"):
                 award_quote(req, options[choice])
-                st.session_state.wizard_step = 5
+                st.session_state.wizard_step = 4
                 st.rerun()
 
-    # ---- Step 5: SAP ----
-    elif step == 5:
+    # ---- Step 4: SAP ----
+    elif step == 4:
         awarded = next((q for q in req.quotes if q.id == req.awarded_quote_id), None)
         st.markdown(
             '<div class="success-banner"><b>Vergabe abgeschlossen.</b> '

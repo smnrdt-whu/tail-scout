@@ -112,10 +112,10 @@ def _step_for_status(status: RequestStatus) -> int:
         RequestStatus.MATCHING: 1,
         RequestStatus.AWAITING_OUTREACH: 2,
         RequestStatus.AWAITING_QUOTES: 3,
-        RequestStatus.COMPARING: 4,
-        RequestStatus.AWAITING_AWARD: 4,
-        RequestStatus.AWARDED: 5,
-        RequestStatus.SUBMITTED_TO_SAP: 5,
+        RequestStatus.COMPARING: 3,
+        RequestStatus.AWAITING_AWARD: 3,
+        RequestStatus.AWARDED: 4,
+        RequestStatus.SUBMITTED_TO_SAP: 4,
         RequestStatus.CANCELLED: 0,
     }
     return mapping.get(status, 0)
@@ -156,7 +156,6 @@ STEPS = [
     "Bedarf",
     "Lieferanten",
     "Anfragen freigeben",
-    "Angebote",
     "Vergleich & Vergabe",
     "SAP-Übergabe",
 ]

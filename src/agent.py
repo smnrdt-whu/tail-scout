@@ -94,6 +94,24 @@ def match_suppliers(
     return top
 
 
+def add_manual_supplier(
+    request: SourcingRequest,
+    supplier: Supplier,
+) -> SupplierMatch | None:
+    """Let the requester add a supplier from the database to the shortlist."""
+    if any(m.supplier.id == supplier.id for m in request.matches):
+        return None
+    match = SupplierMatch(
+        supplier=supplier,
+        score=50.0,
+        reasons=["Manuell aus der Lieferantendatenbank hinzugefügt"],
+        selected=True,
+    )
+    request.matches.append(match)
+    log_activity(request, f"Lieferant manuell hinzugefügt: {supplier.name}")
+    return match
+
+
 def compose_outreach_emails(
     request: SourcingRequest,
     matches: Sequence[SupplierMatch],
