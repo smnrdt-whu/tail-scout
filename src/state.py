@@ -10,7 +10,6 @@ from typing import Any
 
 import streamlit as st
 
-from .agent import hydrate_demo_with_quotes
 from .models import LineItem, RequestStatus, SourcingRequest, Supplier
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -31,6 +30,9 @@ def load_sample_requests() -> list[SourcingRequest]:
 def init_session_state() -> None:
     if "initialized" in st.session_state:
         return
+
+    # Lazy import avoids circular import with src.agent at module load time.
+    from .agent import hydrate_demo_with_quotes
 
     st.session_state.suppliers = load_suppliers()
     st.session_state.requests = load_sample_requests()
