@@ -362,9 +362,13 @@ def advance_after_matching(request: SourcingRequest) -> None:
 
 
 def advance_after_send(request: SourcingRequest) -> None:
+    """Mark outreach as done in the demo flow. No real e-mail is sent."""
     request.status = RequestStatus.AWAITING_QUOTES
     sent = sum(1 for e in request.emails if e.sent)
-    log_activity(request, f"{sent} Angebotsanfragen an Lieferanten gesendet.")
+    log_activity(
+        request,
+        f"{sent} Angebotsanfragen simuliert versendet (kein echter E-Mail-Versand).",
+    )
 
 
 def advance_after_quotes(request: SourcingRequest) -> None:

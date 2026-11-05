@@ -184,7 +184,7 @@ with st.sidebar:
 
     nav = st.radio(
         "Navigation",
-        ["Sourcing-Assistent", "Lieferantendatenbank", "Über den MVP"],
+        ["Sourcing-Assistent", "Lieferantendatenbank"],
         label_visibility="collapsed",
     )
 
@@ -362,9 +362,10 @@ if nav == "Sourcing-Assistent":
     # ---- Step 2: Anfragen freigeben (HITL, optional) ----
     elif step == 2:
         st.markdown(
-            '<div class="hitl-banner"><b>Optionale Freigabe:</b> Entwürfe prüfen und '
-            "anpassen – oder die Freigabe überspringen und direkt senden. "
-            "Der Agent versendet standardmäßig erst nach Ihrer Entscheidung.</div>",
+            '<div class="hitl-banner"><b>Demo – kein echter E-Mail-Versand:</b> '
+            "Entwürfe prüfen und freigeben, oder Freigabe überspringen und den "
+            "simulierten Versand später nachholen. Es verlassen keine Nachrichten "
+            "das System.</div>",
             unsafe_allow_html=True,
         )
 
@@ -396,7 +397,7 @@ if nav == "Sourcing-Assistent":
                 st.rerun()
         with b2:
             if st.button(
-                "Freigeben & senden",
+                "Freigeben & senden (Demo)",
                 type="primary",
                 disabled=not req.emails,
                 key="approve_send",
@@ -404,21 +405,26 @@ if nav == "Sourcing-Assistent":
                 for e in req.emails:
                     e.approved = True
                     e.sent = True
-                log_activity(req, "Anfragen freigegeben und gesendet.")
+                log_activity(
+                    req,
+                    "Anfragen freigegeben und Versand simuliert (kein echter Versand).",
+                )
                 advance_after_send(req)
                 st.session_state.wizard_step = 3
                 st.rerun()
         with b3:
             if st.button(
-                "Freigabe überspringen & senden",
+                "Überspringen",
                 disabled=not req.emails,
-                key="skip_approve_send",
+                key="skip_approve",
             ):
                 for e in req.emails:
                     e.approved = False
-                    e.sent = True
-                log_activity(req, "Freigabe übersprungen – Anfragen direkt gesendet.")
-                advance_after_send(req)
+                    e.sent = False
+                log_activity(
+                    req,
+                    "Freigabe übersprungen – simulierter Versand kann später erfolgen.",
+                )
                 st.session_state.wizard_step = 3
                 st.rerun()
 
@@ -427,15 +433,36 @@ if nav == "Sourcing-Assistent":
         st.markdown(
             '<div class="agent-banner">In der Realität treffen PDF-Angebote per E-Mail ein. '
             "Für die Demo simuliert der Agent realistische Angebote der kontaktierten "
-            "Lieferanten (Header + Positionen + Anfahrt).</div>",
+            "Lieferanten (Header + Positionen + Anfahrt). Es werden keine echten "
+            "E-Mails versendet.</div>",
             unsafe_allow_html=True,
         )
 
-        sent_to = [e.supplier_name for e in req.emails if e.sent]
-        st.write("Anfragen gesendet an:", ", ".join(sent_to) if sent_to else "—")
+        any_sent = bool(req.emails) and any(e.sent for e in req.emails)
+        if not any_sent:
+            st.info(
+                "Anfragen sind noch nicht „versendet“. Der Versand ist nur simuliert "
+                "und dient der Demo – es geht keine E-Mail raus."
+            )
+            if st.button("Anfragen simuliert versenden", type="primary", key="sim_send"):
+                for e in req.emails:
+                    e.sent = True
+                log_activity(
+                    req,
+                    "Versand der Anfragen simuliert (kein echter E-Mail-Versand).",
+                )
+                advance_after_send(req)
+                st.rerun()
+        else:
+            sent_to = [e.supplier_name for e in req.emails if e.sent]
+            st.write("Anfragen (simuliert) gesendet an:", ", ".join(sent_to))
 
         if not req.quotes:
-            if st.button("Angebote abrufen (Simulation)", type="primary"):
+            if st.button(
+                "Angebote abrufen (Simulation)",
+                type="primary",
+                disabled=not any_sent,
+            ):
                 selected_matches = [m for m in req.matches if m.selected]
                 req.quotes = simulate_quotes(req, selected_matches)
                 req.comparison = compare_quotes(req.quotes)
@@ -681,80 +708,3 @@ elif nav == "Lieferantendatenbank":
     ]
     st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
     st.caption(f"{len(rows)} Lieferanten · Mock-Stammdaten für die Demo")
-
-
-# ===========================================================================
-# PAGE: Über den MVP
-# ===========================================================================
-elif nav == "Über den MVP":
-    render_hero(
-        "MVP-Konzept für den Super Day",
-        "Kohärente Übersetzung des RoboXY-Sourcing-Prozesses in ein schlankes Produkt.",
-    )
-
-    st.subheader("Kernschmerzpunkt")
-    st.markdown(
-        """
-        Nicht die SAP-Erfassung – sondern dass bei Bedarfen **unter ~20.000 €**
-        Vergleichsangebote systematisch ausbleiben, weil manueller Aufwand und
-        erwartete Ersparnis (500–1.000 €) in keinem Verhältnis stehen.
-        """
-    )
-
-    st.subheader("Was der MVP abbildet")
-    col_a, col_b = st.columns(2)
-    with col_a:
-        st.markdown(
-            """
-            **Im Scope**
-            - Bedarf mit fertiger Spezifikation übernehmen
-            - Lieferanten aus internem Stamm matchen & ranken
-            - RFQ-E-Mails entwerfen
-            - **Menschliche Freigabe vor Versand**
-            - Angebote simulieren / vergleichen
-            - Vergabeempfehlung + menschliche Entscheidung
-            - SAP-Übergabe als Placeholder
-            """
-        )
-    with col_b:
-        st.markdown(
-            """
-            **Bewusst nicht (Case-Annahmen)**
-            - Echte SAP-/ERP-Schnittstelle
-            - Spec-Erstellung durch den Agenten
-            - Vollautomatischer Versand ohne HITL
-            - End-to-end aller Nebensysteme
-            """
-        )
-
-    st.subheader("Prozess: As-Is → To-Be (MVP)")
-    st.markdown(
-        """
-        | Schritt | As-Is | Mit Agent (MVP) |
-        |---|---|---|
-        | Bedarf | Anforderer spezifiziert | Unverändert übernommen |
-        | Lieferantensuche | 1 Bekannter / optionale DB | Agent rankt 3–4 passende |
-        | Anfrage | Manuell Mail/Telefon | Entwurf + **Freigabe** |
-        | Vergleich | Meist keiner | Automatische Scorecard |
-        | Vergabe | Bauchgefühl / Einzellieferant | Empfehlung + Entscheidung |
-        | SAP | Manuell aus PDF | Mock-Button |
-        """
-    )
-
-    st.subheader("Roadmap")
-    st.markdown(
-        """
-        1. **MVP (jetzt):** HITL an E-Mail-Versand und Vergabe – Demo-fähig, integrierbar
-           in den bestehenden Prozess ohne große Reibung.
-        2. **Pilot:** Echte Mailbox-Anbindung, PDF-Parsing eingehender Angebote.
-        3. **Automatisierung:** Policy-basiert Auto-Send unter Schwellen, Auto-Award
-           bei klarer Score-Dominanz, SAP-API.
-        """
-    )
-
-    st.subheader("Tech-Stack")
-    st.code(
-        "Streamlit · Python · Pandas · Plotly\n"
-        "Deploy: streamlit.io Community Cloud (requirements.txt + app.py)",
-        language="text",
-    )
