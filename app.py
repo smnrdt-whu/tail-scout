@@ -9,6 +9,8 @@ Hostable on Streamlit Community Cloud.
 
 from __future__ import annotations
 
+from datetime import date, timedelta
+
 import pandas as pd
 import plotly.express as px
 import streamlit as st
@@ -26,7 +28,13 @@ from src.agent import (
     submit_to_sap,
 )
 from src.models import RequestStatus, STATUS_LABELS_DE
-from src.state import STEPS, get_request, init_session_state, set_active_request
+from src.state import (
+    STEPS,
+    create_request_from_spec,
+    get_request,
+    init_session_state,
+    set_active_request,
+)
 
 st.set_page_config(
     page_title="RoboXY · Tail-Spend Agent",
@@ -284,46 +292,98 @@ def fmt_eur(value: float) -> str:
 def render_ticket_inbox() -> None:
     render_hero(
         "Offene Bedarfe",
-        "Ticket wählen und den Sourcing-Prozess starten.",
+        "Bedarf spezifizieren oder ein vorhandenes Ticket wählen.",
     )
+
+    st.subheader("Bedarf spezifizieren")
+    st.caption("Der Anforderer beschreibt die benötigte Leistung – Ausgangspunkt des Prozesses.")
+
+    categories = sorted({s.category for s in st.session_state.suppliers})
+    if not categories:
+        categories = ["Malerarbeiten", "Hydraulik / Pneumatik", "Elektroarbeiten"]
+
+    with st.form("new_request"):
+        title = st.text_input("Titel der Leistung", placeholder="z. B. Neuanstrich Produktionshalle")
+        description = st.text_area(
+            "Leistungsbeschreibung",
+            placeholder="Was wird benötigt? Ort, Umfang, Rahmenbedingungen…",
+            height=140,
+        )
+        c1, c2 = st.columns(2)
+        with c1:
+            category = st.selectbox("Kategorie", categories)
+            requester = st.text_input("Anforderer", placeholder="Vor- und Nachname")
+        with c2:
+            estimated_value = st.number_input(
+                "Geschätzter Wert (€)",
+                min_value=0.0,
+                max_value=20000.0,
+                value=5000.0,
+                step=100.0,
+            )
+            needed_by = st.date_input(
+                "Benötigt bis",
+                value=date.today() + timedelta(days=30),
+            )
+        submitted = st.form_submit_button("Bedarf einreichen & starten", type="primary")
+
+    if submitted:
+        if not title.strip() or not description.strip():
+            st.error("Bitte Titel und Leistungsbeschreibung angeben.")
+        else:
+            request_id = create_request_from_spec(
+                title=title,
+                description=description,
+                category=category,
+                estimated_value_eur=estimated_value,
+                needed_by=needed_by.isoformat(),
+                requester=requester,
+            )
+            set_active_request(request_id)
+            st.rerun()
+
+    st.markdown("---")
+    st.subheader("Oder vorhandenes Ticket wählen")
     st.markdown(
-        '<div class="agent-banner">Jeder Eintrag ist ein eingegangener Bedarf '
-        "(z.&nbsp;B. aus Facility oder Produktion). Mit der Auswahl übernimmt der "
-        "Agent die Vergleichsangebote – ohne Extraaufwand für den Einkauf.</div>",
+        '<div class="agent-banner">Beispiel-Bedarfe für die Demo. Mit der Auswahl '
+        "übernimmt der Agent die Vergleichsangebote – ohne Extraaufwand für den "
+        "Einkauf.</div>",
         unsafe_allow_html=True,
     )
 
     requests = st.session_state.requests
-    cols = st.columns(len(requests) if requests else 1)
-    for col, req in zip(cols, requests):
-        urgency_cls = req.urgency.lower().replace(" ", "-")
-        with col:
-            st.markdown(
-                f"""
-                <div class="ticket-card">
-                  <div class="ticket-id">{req.id}</div>
-                  <div class="ticket-title">{req.title}</div>
-                  <div class="ticket-meta">
-                    {req.category} · {req.site}<br/>
-                    Anforderer: {req.requester}<br/>
-                    Benötigt bis: {req.needed_by}
-                  </div>
-                  <div class="ticket-value">{fmt_eur(req.estimated_value_eur)}</div>
-                  <span class="ticket-urgency {urgency_cls}">{req.urgency}</span>
-                  · {STATUS_LABELS_DE[req.status]}
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
-            st.markdown("")
-            if st.button(
-                "Prozess starten",
-                key=f"start_{req.id}",
-                type="primary",
-                use_container_width=True,
-            ):
-                set_active_request(req.id)
-                st.rerun()
+    for row_start in range(0, len(requests), 3):
+        row = requests[row_start : row_start + 3]
+        cols = st.columns(len(row))
+        for col, req in zip(cols, row):
+            urgency_cls = req.urgency.lower().replace(" ", "-")
+            with col:
+                st.markdown(
+                    f"""
+                    <div class="ticket-card">
+                      <div class="ticket-id">{req.id}</div>
+                      <div class="ticket-title">{req.title}</div>
+                      <div class="ticket-meta">
+                        {req.category} · {req.site}<br/>
+                        Anforderer: {req.requester}<br/>
+                        Benötigt bis: {req.needed_by}
+                      </div>
+                      <div class="ticket-value">{fmt_eur(req.estimated_value_eur)}</div>
+                      <span class="ticket-urgency {urgency_cls}">{req.urgency}</span>
+                      · {STATUS_LABELS_DE[req.status]}
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+                st.markdown("")
+                if st.button(
+                    "Prozess starten",
+                    key=f"start_{req.id}",
+                    type="primary",
+                    use_container_width=True,
+                ):
+                    set_active_request(req.id)
+                    st.rerun()
 
 
 # ===========================================================================
