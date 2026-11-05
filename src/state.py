@@ -10,10 +10,12 @@ from typing import Any
 
 import streamlit as st
 
+from .agent import hydrate_demo_with_quotes
 from .models import LineItem, RequestStatus, SourcingRequest, Supplier
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "data"
+DEMO_READY_REQUEST_ID = "REQ-2026-0142"
 
 
 def load_suppliers() -> list[Supplier]:
@@ -32,6 +34,9 @@ def init_session_state() -> None:
 
     st.session_state.suppliers = load_suppliers()
     st.session_state.requests = load_sample_requests()
+    for req in st.session_state.requests:
+        if req.id == DEMO_READY_REQUEST_ID:
+            hydrate_demo_with_quotes(req, st.session_state.suppliers)
     st.session_state.active_request_id = None
     st.session_state.wizard_step = 0
     st.session_state.demo_mode = True

@@ -18,18 +18,17 @@ import streamlit as st
 from src.agent import (
     add_manual_supplier,
     advance_after_matching,
-    advance_after_quotes,
     advance_after_send,
     award_quote,
     compare_quotes,
     compose_outreach_emails,
     log_activity,
     match_suppliers,
-    simulate_quotes,
     submit_to_sap,
 )
 from src.models import RequestStatus, STATUS_LABELS_DE
 from src.state import (
+    DEMO_READY_REQUEST_ID,
     STEPS,
     create_request_from_spec,
     get_request,
@@ -343,44 +342,54 @@ def render_ticket_inbox() -> None:
             set_active_request(request_id)
             st.rerun()
 
+    def _render_ticket_cards(ticket_list: list) -> None:
+        for row_start in range(0, len(ticket_list), 3):
+            row = ticket_list[row_start : row_start + 3]
+            cols = st.columns(len(row))
+            for col, ticket in zip(cols, row):
+                with col:
+                    st.markdown(
+                        f"""
+                        <div class="ticket-card">
+                          <div class="ticket-id">{ticket.id}</div>
+                          <div class="ticket-title">{ticket.title}</div>
+                          <div class="ticket-meta">
+                            {ticket.category} · {ticket.site}<br/>
+                            Anforderer: {ticket.requester}<br/>
+                            Benötigt bis: {ticket.needed_by}
+                          </div>
+                          <div class="ticket-value">{fmt_eur(ticket.estimated_value_eur)}</div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+                    st.markdown("")
+                    if st.button(
+                        "Prozess starten",
+                        key=f"start_{ticket.id}",
+                        type="primary",
+                        use_container_width=True,
+                    ):
+                        set_active_request(ticket.id)
+                        st.rerun()
+
+    all_requests = st.session_state.requests
+    demo_tickets = [r for r in all_requests if r.id == DEMO_READY_REQUEST_ID]
+    own_tickets = [r for r in all_requests if r.id != DEMO_READY_REQUEST_ID]
+
     st.markdown("---")
-    st.subheader("Oder vorhandenes Ticket wählen")
+    st.subheader("Beispiel-Ticket mit eingegangenen Angeboten")
     st.markdown(
-        '<div class="agent-banner">Beispiel-Bedarfe für die Demo. Mit der Auswahl '
-        "übernimmt der Agent die Vergleichsangebote.</div>",
+        '<div class="agent-banner">Anfragen wurden vor einiger Zeit versendet – '
+        "die Angebote sind bereits einsehbar und vergleichbar.</div>",
         unsafe_allow_html=True,
     )
+    _render_ticket_cards(demo_tickets)
 
-    requests = st.session_state.requests
-    for row_start in range(0, len(requests), 3):
-        row = requests[row_start : row_start + 3]
-        cols = st.columns(len(row))
-        for col, req in zip(cols, row):
-            with col:
-                st.markdown(
-                    f"""
-                    <div class="ticket-card">
-                      <div class="ticket-id">{req.id}</div>
-                      <div class="ticket-title">{req.title}</div>
-                      <div class="ticket-meta">
-                        {req.category} · {req.site}<br/>
-                        Anforderer: {req.requester}<br/>
-                        Benötigt bis: {req.needed_by}
-                      </div>
-                      <div class="ticket-value">{fmt_eur(req.estimated_value_eur)}</div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
-                st.markdown("")
-                if st.button(
-                    "Prozess starten",
-                    key=f"start_{req.id}",
-                    type="primary",
-                    use_container_width=True,
-                ):
-                    set_active_request(req.id)
-                    st.rerun()
+    if own_tickets:
+        st.markdown("---")
+        st.subheader("Ihre spezifizierten Bedarfe")
+        _render_ticket_cards(own_tickets)
 
 
 # ===========================================================================
@@ -535,7 +544,7 @@ if nav == "Sourcing-Assistent":
         st.markdown(
             '<div class="hitl-banner"><b>Demo – kein echter E-Mail-Versand:</b> '
             "Entwürfe prüfen und freigeben, oder Freigabe überspringen. "
-            "Beim Fortfahren werden Angebote nur simuliert – es verlassen keine "
+            "Nach dem Versand warten Sie auf Angebote – es verlassen keine "
             "Nachrichten das System.</div>",
             unsafe_allow_html=True,
         )
@@ -560,12 +569,6 @@ if nav == "Sourcing-Assistent":
                     key=f"body_{req.id}_{email.supplier_id}",
                 )
 
-        def _simulate_quotes_and_compare() -> None:
-            selected_matches = [m for m in req.matches if m.selected]
-            req.quotes = simulate_quotes(req, selected_matches)
-            req.comparison = compare_quotes(req.quotes)
-            advance_after_quotes(req)
-
         st.markdown("---")
         b1, b2, b3 = st.columns(3)
         with b1:
@@ -587,7 +590,6 @@ if nav == "Sourcing-Assistent":
                     "Anfragen freigegeben und Versand simuliert (kein echter Versand).",
                 )
                 advance_after_send(req)
-                _simulate_quotes_and_compare()
                 st.session_state.wizard_step = 3
                 st.rerun()
         with b3:
@@ -606,42 +608,44 @@ if nav == "Sourcing-Assistent":
                 st.session_state.wizard_step = 3
                 st.rerun()
 
-    # ---- Step 3: Vergleich & Vergabe (HITL) ----
+    # ---- Step 3: Vergleich & Auswahl ----
     elif step == 3:
         any_sent = bool(req.emails) and any(e.sent for e in req.emails)
 
         if not req.quotes:
-            st.markdown(
-                '<div class="agent-banner">Noch keine Angebote. In der Demo werden '
-                "Antworten der angefragten Lieferanten simuliert (kein echter "
-                "E-Mail-Versand).</div>",
-                unsafe_allow_html=True,
-            )
             if not any_sent:
+                st.markdown(
+                    '<div class="agent-banner">Noch keine Anfragen versendet. '
+                    "Erst nach dem Versand warten Sie auf Angebote der "
+                    "Lieferanten.</div>",
+                    unsafe_allow_html=True,
+                )
+                if st.button(
+                    "Anfragen simuliert versenden",
+                    type="primary",
+                    key="sim_send_only",
+                ):
+                    for e in req.emails:
+                        e.sent = True
+                    advance_after_send(req)
+                    st.rerun()
+            else:
+                sent_to = [e.supplier_name for e in req.emails if e.sent]
+                st.markdown(
+                    '<div class="agent-banner"><b>Warten auf Angebote.</b> '
+                    "Die Anfragen wurden versendet. Sobald Lieferanten antworten, "
+                    "erscheinen die Angebote hier zum Vergleich.</div>",
+                    unsafe_allow_html=True,
+                )
                 st.info(
-                    "Anfragen sind noch nicht „versendet“. Mit dem Button unten "
-                    "werden Versand und Angebotseingang nur simuliert."
+                    "Versendet an: "
+                    + (", ".join(sent_to) if sent_to else "—")
+                    + ". Für fertige Angebote öffnen Sie das vorbereitete "
+                    f"Beispiel-Ticket ({DEMO_READY_REQUEST_ID})."
                 )
-            if st.button(
-                "Anfragen senden & Angebote einholen (Demo)",
-                type="primary",
-                key="sim_send_quotes",
-            ):
-                for e in req.emails:
-                    e.sent = True
-                log_activity(
-                    req,
-                    "Versand und Angebotseingang simuliert (kein echter E-Mail-Versand).",
-                )
-                advance_after_send(req)
-                selected_matches = [m for m in req.matches if m.selected]
-                req.quotes = simulate_quotes(req, selected_matches)
-                req.comparison = compare_quotes(req.quotes)
-                advance_after_quotes(req)
-                st.rerun()
 
             st.markdown("---")
-            if st.button("Zurück", key="back_step3_no_quotes"):
+            if st.button("Zurück", key="back_step3_waiting"):
                 st.session_state.wizard_step = 2
                 st.rerun()
             st.stop()
@@ -653,9 +657,9 @@ if nav == "Sourcing-Assistent":
         recommended = next(q for q in req.quotes if q.id == comp.recommended_quote_id)
 
         st.markdown(
-            '<div class="hitl-banner"><b>Ihre Entscheidung:</b> Der Agent empfiehlt – '
-            "als Bedarfsperson wählen Sie den Lieferanten und reichen den Auftrag "
-            "anschließend beim Einkauf ein.</div>",
+            '<div class="hitl-banner"><b>Angebote eingegangen.</b> Der Agent '
+            "empfiehlt – als Bedarfsperson wählen Sie den Lieferanten und reichen "
+            "den Auftrag anschließend beim Einkauf ein.</div>",
             unsafe_allow_html=True,
         )
 

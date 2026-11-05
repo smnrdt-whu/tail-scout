@@ -385,8 +385,42 @@ def advance_after_send(request: SourcingRequest) -> None:
     sent = sum(1 for e in request.emails if e.sent)
     log_activity(
         request,
-        f"{sent} Angebotsanfragen simuliert versendet (kein echter E-Mail-Versand).",
+        f"{sent} Angebotsanfragen simuliert versendet (kein echter E-Mail-Versand) – "
+        "warte auf Angebote.",
     )
+
+
+def hydrate_demo_with_quotes(
+    request: SourcingRequest,
+    suppliers: Sequence[Supplier],
+) -> None:
+    """Preload one example request where outreach was sent earlier and quotes arrived."""
+    if request.quotes:
+        return
+
+    request.matches = match_suppliers(request, suppliers, top_n=4)
+    request.emails = compose_outreach_emails(request, request.matches)
+    sent_on = (date.today() - timedelta(days=5)).isoformat()
+    for email in request.emails:
+        email.approved = True
+        email.sent = True
+
+    request.quotes = simulate_quotes(request, request.matches)
+    for quote in request.quotes:
+        quote.received_at = (date.today() - timedelta(days=2)).isoformat()
+
+    request.comparison = compare_quotes(request.quotes)
+    request.status = RequestStatus.AWAITING_AWARD
+    request.activity_log = [
+        {
+            "timestamp": f"{sent_on} 09:15",
+            "message": f"{len(request.emails)} Anfragen vor einigen Tagen versendet (Demo).",
+        },
+        {
+            "timestamp": f"{(date.today() - timedelta(days=2)).isoformat()} 14:40",
+            "message": f"{len(request.quotes)} Angebote eingegangen – bereit zum Vergleich.",
+        },
+    ]
 
 
 def advance_after_quotes(request: SourcingRequest) -> None:

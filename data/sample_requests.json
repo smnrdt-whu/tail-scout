@@ -21,48 +21,5 @@
       {"description": "Abkleben / Schutz Maschinen & Boden", "quantity": 1, "unit": "pauschal"},
       {"description": "Anfahrt / Auf-/Abbau", "quantity": 1, "unit": "pauschal"}
     ]
-  },
-  {
-    "id": "REQ-2026-0138",
-    "title": "Reparaturanstrich Bürotrakt Empfang",
-    "category": "Malerarbeiten",
-    "subcategory": "Innenanstrich",
-    "description": "Ausbesserungsarbeiten Empfangsbereich und Flur EG (ca. 180 m²). Stellenweise Flecken und Abnutzung. Farbe abstimmen mit bestehendem Weißton. Ausführung nach Feierabend.",
-    "requester": "Sandra Vogt",
-    "department": "Administration",
-    "cost_center": "CC-1100",
-    "site": "Werk München-Nord",
-    "estimated_value_eur": 2200,
-    "urgency": "Niedrig",
-    "needed_by": "2026-11-30",
-    "created_at": "2026-10-28",
-    "status": "new",
-    "spec_quality": "high",
-    "line_items": [
-      {"description": "Ausbesserungsanstrich Wände", "quantity": 180, "unit": "m²"},
-      {"description": "Anfahrt", "quantity": 1, "unit": "pauschal"}
-    ]
-  },
-  {
-    "id": "REQ-2026-0129",
-    "title": "Austausch Hydraulikschlauch Presse P-07",
-    "category": "Hydraulik / Pneumatik",
-    "subcategory": "Reparatur",
-    "description": "Austausch defekter Hydraulikschlauch an Presse P-07 inkl. Dichtungen und Druckprüfung. Schlauchlänge ca. 2,4 m, DN16, Anschluss nach Spezifikation Zeichnung HYD-P07-A.",
-    "requester": "Marcus Lehmann",
-    "department": "Produktion",
-    "cost_center": "CC-3200",
-    "site": "Werk München-Nord",
-    "estimated_value_eur": 1450,
-    "urgency": "Hoch",
-    "needed_by": "2026-11-10",
-    "created_at": "2026-11-01",
-    "status": "new",
-    "spec_quality": "high",
-    "line_items": [
-      {"description": "Hydraulikschlauch DN16 nach Zeichnung", "quantity": 1, "unit": "Stk"},
-      {"description": "Dichtungssatz", "quantity": 1, "unit": "Satz"},
-      {"description": "Montage & Druckprüfung vor Ort", "quantity": 1, "unit": "pauschal"}
-    ]
   }
 ]
