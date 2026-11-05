@@ -360,12 +360,6 @@ elif nav == "Sourcing-Assistent":
 
     # ---- Step 0: Bedarf ----
     if step == 0:
-        st.markdown(
-            '<div class="agent-banner">Die Spezifikation liegt bereits in ausreichender '
-            "Qualität vor (Annahme aus dem Case). Der Agent startet direkt mit der "
-            "Lieferantensuche – kein zusätzliches Spec-Engineering nötig.</div>",
-            unsafe_allow_html=True,
-        )
         c1, c2 = st.columns((1.6, 1))
         with c1:
             st.subheader("Leistungsbeschreibung")
@@ -401,12 +395,6 @@ elif nav == "Sourcing-Assistent":
             }
             for k, v in meta.items():
                 st.markdown(f"**{k}**  \n{v}")
-
-            if req.estimated_value_eur < 20000:
-                st.warning(
-                    "Tail Spend (< 20.000 €): Ohne Agent würde hier **kein** "
-                    "Vergleichsprozess angestoßen."
-                )
 
         st.markdown("---")
         if st.button("Agent: Passende Lieferanten suchen", type="primary"):
