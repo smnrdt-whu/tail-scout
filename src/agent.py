@@ -398,13 +398,21 @@ def award_quote(request: SourcingRequest, quote_id: str) -> None:
     request.awarded_quote_id = quote_id
     request.status = RequestStatus.AWARDED
     quote = next(q for q in request.quotes if q.id == quote_id)
-    log_activity(request, f"Vergabe an {quote.supplier_name} ({quote.total:,.2f} €).")
+    log_activity(
+        request,
+        f"Auswahl bestätigt: {quote.supplier_name} ({quote.total:,.2f} €).",
+    )
 
 
 def submit_to_sap(request: SourcingRequest) -> str:
-    """Mock SAP PO creation – placeholder for ERP integration."""
+    """Mock: requester submits the award to procurement and records it in SAP."""
     po = f"PO-{request.id.replace('REQ-', '')}-{request.awarded_quote_id[-3:]}"
     request.sap_po_number = po
     request.status = RequestStatus.SUBMITTED_TO_SAP
-    log_activity(request, f"Bestellung {po} an SAP übergeben (Mock).")
+    quote = next(q for q in request.quotes if q.id == request.awarded_quote_id)
+    log_activity(
+        request,
+        f"Auftrag an Einkauf eingereicht und in SAP hinterlegt "
+        f"({po}, {quote.supplier_name}) – Demo/Mock, keine echte Schnittstelle.",
+    )
     return po

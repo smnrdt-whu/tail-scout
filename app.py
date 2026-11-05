@@ -653,8 +653,9 @@ if nav == "Sourcing-Assistent":
         recommended = next(q for q in req.quotes if q.id == comp.recommended_quote_id)
 
         st.markdown(
-            '<div class="hitl-banner"><b>Human-in-the-Loop:</b> Der Agent empfiehlt – '
-            "die Vergabeentscheidung trifft der Mensch.</div>",
+            '<div class="hitl-banner"><b>Ihre Entscheidung:</b> Der Agent empfiehlt – '
+            "als Bedarfsperson wählen Sie den Lieferanten und reichen den Auftrag "
+            "anschließend beim Einkauf ein.</div>",
             unsafe_allow_html=True,
         )
 
@@ -734,13 +735,13 @@ if nav == "Sourcing-Assistent":
                 )
                 st.caption(q.notes)
 
-        st.subheader("Vergabe")
+        st.subheader("Auswahl")
         options = {f"{q.supplier_name} – {fmt_eur(q.total)} ({q.id})": q.id for q in req.quotes}
         default_label = next(
             label for label, qid in options.items() if qid == comp.recommended_quote_id
         )
         choice = st.radio(
-            "Lieferant beauftragen",
+            "Bevorzugter Lieferant",
             list(options.keys()),
             index=list(options.keys()).index(default_label),
         )
@@ -752,24 +753,24 @@ if nav == "Sourcing-Assistent":
                 st.session_state.wizard_step = 2
                 st.rerun()
         with b2:
-            if st.button("Vergabe bestätigen", type="primary"):
+            if st.button("Auswahl bestätigen", type="primary"):
                 award_quote(req, options[choice])
                 st.session_state.wizard_step = 4
                 st.rerun()
 
-    # ---- Step 4: SAP ----
+    # ---- Step 4: Beim Einkauf einreichen (+ SAP) ----
     elif step == 4:
         awarded = next((q for q in req.quotes if q.id == req.awarded_quote_id), None)
         st.markdown(
-            '<div class="success-banner"><b>Vergabe abgeschlossen.</b> '
-            "Nachgelagert: manuelle SAP-Erfassung entfällt perspektivisch – "
-            "hier als Mock „Submit to SAP“ dargestellt (sekundäres Problem laut Case).</div>",
+            '<div class="success-banner"><b>Auswahl steht.</b> Als Bedarfsperson '
+            "reichen Sie den Auftrag jetzt beim Einkauf ein – parallel wird er in "
+            "SAP hinterlegt (Demo/Mock, keine echte Schnittstelle).</div>",
             unsafe_allow_html=True,
         )
 
         if awarded:
             c1, c2, c3 = st.columns(3)
-            c1.metric("Lieferant", awarded.supplier_name)
+            c1.metric("Gewählter Lieferant", awarded.supplier_name)
             c2.metric("Auftragswert", fmt_eur(awarded.total))
             c3.metric(
                 "Status",
@@ -783,12 +784,20 @@ if nav == "Sourcing-Assistent":
                 )
 
         if req.status != RequestStatus.SUBMITTED_TO_SAP:
-            if st.button("In SAP erfassen (Mock)", type="primary"):
+            if st.button(
+                "Beim Einkauf einreichen & in SAP hinterlegen",
+                type="primary",
+            ):
                 po = submit_to_sap(req)
-                st.success(f"Bestellung {po} angelegt (Mock-Schnittstelle).")
+                st.success(
+                    f"Auftrag an den Einkauf übermittelt und in SAP hinterlegt "
+                    f"(Bestellung **{po}**, Demo/Mock)."
+                )
                 st.rerun()
         else:
-            st.success(f"SAP-Bestellung: **{req.sap_po_number}**")
+            st.success(
+                f"Eingereicht beim Einkauf · SAP-Bestellung **{req.sap_po_number}**"
+            )
             st.balloons()
 
         st.subheader("Aktivitätsprotokoll")
@@ -799,8 +808,8 @@ if nav == "Sourcing-Assistent":
             st.caption("Noch keine Einträge.")
 
         st.markdown("---")
-        if st.button("Neuen Bedarf starten / zurück zum Bedarf"):
-            st.session_state.wizard_step = 0
+        if st.button("Neuen Bedarf starten"):
+            set_active_request(None)
             st.rerun()
 
 

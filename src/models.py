@@ -25,9 +25,9 @@ STATUS_LABELS_DE = {
     RequestStatus.AWAITING_OUTREACH: "Freigabe Anfragen",
     RequestStatus.AWAITING_QUOTES: "Warte auf Angebote",
     RequestStatus.COMPARING: "Angebotsvergleich",
-    RequestStatus.AWAITING_AWARD: "Vergabeentscheidung",
-    RequestStatus.AWARDED: "Beauftragt",
-    RequestStatus.SUBMITTED_TO_SAP: "In SAP erfasst",
+    RequestStatus.AWAITING_AWARD: "Auswahl getroffen",
+    RequestStatus.AWARDED: "Auswahl bestätigt",
+    RequestStatus.SUBMITTED_TO_SAP: "Beim Einkauf & in SAP eingereicht",
     RequestStatus.CANCELLED: "Abgebrochen",
 }
 

@@ -156,6 +156,6 @@ STEPS = [
     "Bedarf",
     "Lieferanten",
     "Anfragen freigeben",
-    "Vergleich & Vergabe",
-    "SAP-Übergabe",
+    "Vergleich & Auswahl",
+    "Beim Einkauf einreichen",
 ]
