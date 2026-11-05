@@ -166,6 +166,57 @@ div[data-testid="stSidebar"] div[data-baseweb="select"] > div {
   font-size: 0.75rem;
   margin-right: 0.3rem;
 }
+
+.ticket-card {
+  background: #FFFFFF;
+  border: 1px solid #D5E0EA;
+  border-left: 5px solid #1B4F72;
+  border-radius: 10px;
+  padding: 1.1rem 1.2rem 1.2rem;
+  height: 100%;
+  box-shadow: 0 4px 14px rgba(15, 42, 61, 0.06);
+}
+.ticket-card .ticket-id {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #2E86AB;
+  margin-bottom: 0.35rem;
+}
+.ticket-card .ticket-title {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #0F2A3D;
+  line-height: 1.3;
+  margin-bottom: 0.7rem;
+  min-height: 2.6rem;
+}
+.ticket-card .ticket-meta {
+  color: #5A6F82;
+  font-size: 0.86rem;
+  line-height: 1.55;
+}
+.ticket-card .ticket-value {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #0F2A3D;
+  margin: 0.75rem 0 0.15rem;
+}
+.ticket-urgency {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.12rem 0.45rem;
+  border-radius: 4px;
+  background: #E8EEF4;
+  color: #1B4F72;
+}
+.ticket-urgency.hoch { background: #FDECEA; color: #9B1C1C; }
+.ticket-urgency.normal { background: #E8F4F8; color: #1B4F72; }
+.ticket-urgency.niedrig { background: #EEF2F5; color: #5A6F82; }
 </style>
 """,
     unsafe_allow_html=True,
@@ -188,25 +239,15 @@ with st.sidebar:
         label_visibility="collapsed",
     )
 
-    st.markdown("---")
-    st.markdown("**Aktiver Bedarf**")
-    req_options = {f"{r.id} · {r.title[:42]}": r.id for r in st.session_state.requests}
-    labels = list(req_options.keys())
-    current = st.session_state.active_request_id
-    default_idx = 0
-    for i, (label, rid) in enumerate(req_options.items()):
-        if rid == current:
-            default_idx = i
-            break
-    chosen = st.selectbox("Bedarf wählen", labels, index=default_idx, label_visibility="collapsed")
-    if req_options[chosen] != st.session_state.active_request_id:
-        set_active_request(req_options[chosen])
-        st.rerun()
-
     active = get_request()
     if active:
-        st.caption(f"Status: {STATUS_LABELS_DE[active.status]}")
-        st.caption(f"Schätzwert: {active.estimated_value_eur:,.0f} €")
+        st.markdown("---")
+        st.caption("Aktives Ticket")
+        st.markdown(f"**{active.id}**")
+        st.caption(STATUS_LABELS_DE[active.status])
+        if st.button("Zur Ticketauswahl", use_container_width=True):
+            set_active_request(None)
+            st.rerun()
 
     st.markdown("---")
     if st.button("Demo zurücksetzen", use_container_width=True):
@@ -240,13 +281,58 @@ def fmt_eur(value: float) -> str:
     return f"{value:,.2f} €".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
+def render_ticket_inbox() -> None:
+    render_hero(
+        "Offene Bedarfe",
+        "Ticket wählen und den Sourcing-Prozess starten.",
+    )
+    st.markdown(
+        '<div class="agent-banner">Jeder Eintrag ist ein eingegangener Bedarf '
+        "(z.&nbsp;B. aus Facility oder Produktion). Mit der Auswahl übernimmt der "
+        "Agent die Vergleichsangebote – ohne Extraaufwand für den Einkauf.</div>",
+        unsafe_allow_html=True,
+    )
+
+    requests = st.session_state.requests
+    cols = st.columns(len(requests) if requests else 1)
+    for col, req in zip(cols, requests):
+        urgency_cls = req.urgency.lower().replace(" ", "-")
+        with col:
+            st.markdown(
+                f"""
+                <div class="ticket-card">
+                  <div class="ticket-id">{req.id}</div>
+                  <div class="ticket-title">{req.title}</div>
+                  <div class="ticket-meta">
+                    {req.category} · {req.site}<br/>
+                    Anforderer: {req.requester}<br/>
+                    Benötigt bis: {req.needed_by}
+                  </div>
+                  <div class="ticket-value">{fmt_eur(req.estimated_value_eur)}</div>
+                  <span class="ticket-urgency {urgency_cls}">{req.urgency}</span>
+                  · {STATUS_LABELS_DE[req.status]}
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+            st.markdown("")
+            if st.button(
+                "Prozess starten",
+                key=f"start_{req.id}",
+                type="primary",
+                use_container_width=True,
+            ):
+                set_active_request(req.id)
+                st.rerun()
+
+
 # ===========================================================================
 # PAGE: Sourcing-Assistent
 # ===========================================================================
 if nav == "Sourcing-Assistent":
     req = get_request()
     if req is None:
-        st.error("Kein Bedarf ausgewählt.")
+        render_ticket_inbox()
         st.stop()
 
     render_hero(

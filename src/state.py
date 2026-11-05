@@ -30,7 +30,7 @@ def init_session_state() -> None:
 
     st.session_state.suppliers = load_suppliers()
     st.session_state.requests = load_sample_requests()
-    st.session_state.active_request_id = st.session_state.requests[0].id
+    st.session_state.active_request_id = None
     st.session_state.wizard_step = 0
     st.session_state.demo_mode = True
     st.session_state.annual_cases = 250
@@ -39,16 +39,22 @@ def init_session_state() -> None:
 
 
 def get_request(request_id: str | None = None) -> SourcingRequest | None:
-    rid = request_id or st.session_state.get("active_request_id")
+    rid = request_id if request_id is not None else st.session_state.get("active_request_id")
+    if not rid:
+        return None
     for req in st.session_state.requests:
         if req.id == rid:
             return req
     return None
 
 
-def set_active_request(request_id: str) -> None:
+def set_active_request(request_id: str | None) -> None:
     st.session_state.active_request_id = request_id
-    st.session_state.wizard_step = _step_for_status(get_request(request_id).status)
+    if request_id is None:
+        st.session_state.wizard_step = 0
+        return
+    req = get_request(request_id)
+    st.session_state.wizard_step = _step_for_status(req.status) if req else 0
 
 
 def _step_for_status(status: RequestStatus) -> int:
