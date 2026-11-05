@@ -53,6 +53,14 @@ h1, h2, h3, .stMarkdown h1, .stMarkdown h2 {
 }
 .block-container { padding-top: 1.4rem; max-width: 1200px; }
 
+/* Hide Streamlit chrome / Cloud GitHub toolbar where possible */
+header[data-testid="stHeader"] { display: none !important; }
+#MainMenu { visibility: hidden; }
+footer { visibility: hidden; }
+div[data-testid="stToolbar"] { display: none !important; }
+a[href*="github.com"][data-testid="stToolbarActionButton"],
+div[data-testid="stDecoration"] { display: none !important; }
+
 div[data-testid="stSidebar"] {
   background: linear-gradient(180deg, #0F2A3D 0%, #1B4F72 55%, #245A7A 100%);
 }
@@ -238,9 +246,8 @@ def fmt_eur(value: float) -> str:
 # ===========================================================================
 if nav == "Übersicht":
     render_hero(
-        "Wettbewerb für Tail Spend – ohne Extraaufwand",
-        "KI-gestützte Vergleichsangebote für Bedarfe unter 20.000 €. "
-        "Der Mensch gibt frei, der Agent erledigt Suche, Anfrage und Vergleich.",
+        "Tail Spend",
+        "KI-gestützte Vergleichsangebote für Bedarfe unter 20.000 €",
     )
 
     kpis = portfolio_kpis()
@@ -273,19 +280,6 @@ if nav == "Übersicht":
     left, right = st.columns((1.35, 1))
 
     with left:
-        st.subheader("Warum das heute scheitert")
-        st.markdown(
-            """
-            Bei RoboXY (Fertigung von Robotik-Bauteilen) entstehen jährlich **200–300**
-            Low-Value-Bedarfe unter ~20.000 € – z. B. Malerdienstleistungen.
-
-            1. Anforderer fragen meist **nur einen bekannten Lieferanten** an.
-            2. Einkauf verzichtet bewusst auf Vergleichsangebote – der manuelle Aufwand
-               steht in keinem Verhältnis zur erwarteten Ersparnis (~500–1.000 €/Fall).
-            3. Ergebnis: systematisch suboptimale Vergaben, obwohl Spezifikationen
-               bereits ausreichend vorliegen.
-            """
-        )
         st.markdown(
             '<div class="agent-banner"><b>MVP-Fokus:</b> Lieferantensuche → '
             "Anfrageentwurf → menschliche Freigabe der E-Mails → Angebotsvergleich → "
