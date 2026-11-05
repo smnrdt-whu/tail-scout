@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import pandas as pd
 import plotly.express as px
-import plotly.graph_objects as go
 import streamlit as st
 
 from src.agent import (
@@ -27,7 +26,7 @@ from src.agent import (
     submit_to_sap,
 )
 from src.models import RequestStatus, STATUS_LABELS_DE
-from src.state import STEPS, get_request, init_session_state, portfolio_kpis, set_active_request
+from src.state import STEPS, get_request, init_session_state, set_active_request
 
 st.set_page_config(
     page_title="RoboXY · Tail-Spend Agent",
@@ -185,7 +184,7 @@ with st.sidebar:
 
     nav = st.radio(
         "Navigation",
-        ["Übersicht", "Sourcing-Assistent", "Lieferantendatenbank", "Über den MVP"],
+        ["Sourcing-Assistent", "Lieferantendatenbank", "Über den MVP"],
         label_visibility="collapsed",
     )
 
@@ -242,108 +241,9 @@ def fmt_eur(value: float) -> str:
 
 
 # ===========================================================================
-# PAGE: Übersicht
-# ===========================================================================
-if nav == "Übersicht":
-    render_hero(
-        "Tail Spend",
-        "KI-gestützte Vergleichsangebote für Bedarfe unter 20.000 €",
-    )
-
-    kpis = portfolio_kpis()
-    c1, c2, c3, c4 = st.columns(4)
-    tiles = [
-        (c1, "Offene Bedarfe", str(kpis["open"]), "im Assistenten"),
-        (c2, "Vergaben (Demo)", str(kpis["awarded"]), "mit Vergleich"),
-        (
-            c3,
-            "Jahrespotenzial",
-            f"{kpis['annual_potential']:,.0f} €".replace(",", "."),
-            f"{kpis['annual_cases']} Fälle × ~750 €",
-        ),
-        (
-            c4,
-            "Realisierte Demo-Ersparnis",
-            fmt_eur(kpis["realized_savings"]),
-            "vs. Stamm-lieferant",
-        ),
-    ]
-    for col, label, value, hint in tiles:
-        with col:
-            st.markdown(
-                f'<div class="kpi-tile"><div class="label">{label}</div>'
-                f'<div class="value">{value}</div><div class="hint">{hint}</div></div>',
-                unsafe_allow_html=True,
-            )
-
-    st.markdown("")
-    left, right = st.columns((1.35, 1))
-
-    with left:
-        st.markdown(
-            '<div class="agent-banner"><b>MVP-Fokus:</b> Lieferantensuche → '
-            "Anfrageentwurf → menschliche Freigabe der E-Mails → Angebotsvergleich → "
-            "Vergabeempfehlung. SAP-Übergabe als Mock.</div>",
-            unsafe_allow_html=True,
-        )
-
-    with right:
-        st.subheader("Einsparhebel")
-        fig = go.Figure(
-            go.Bar(
-                x=["Ohne Agent\n(1 Lieferant)", "Mit Agent\n(3–4 Angebote)"],
-                y=[8500, 8500 - 750],
-                marker_color=["#8FA6B8", "#1B4F72"],
-                text=["typisch", "−750 €"],
-                textposition="outside",
-            )
-        )
-        fig.update_layout(
-            height=280,
-            margin=dict(l=10, r=10, t=30, b=10),
-            yaxis_title="Beispielkosten (€)",
-            yaxis=dict(range=[0, 10000]),
-            showlegend=False,
-            plot_bgcolor="rgba(0,0,0,0)",
-            paper_bgcolor="rgba(0,0,0,0)",
-        )
-        st.plotly_chart(fig, use_container_width=True)
-        st.caption("Illustrativ: Ø-Ersparnis 500–1.000 € pro Fall × 250 Fälle/Jahr ≈ 125–250 T€.")
-
-    st.subheader("Bedarfsübersicht")
-    rows = []
-    for r in st.session_state.requests:
-        rows.append(
-            {
-                "ID": r.id,
-                "Titel": r.title,
-                "Kategorie": r.category,
-                "Schätzwert": r.estimated_value_eur,
-                "Anforderer": r.requester,
-                "Status": STATUS_LABELS_DE[r.status],
-                "Benötigt bis": r.needed_by,
-            }
-        )
-    df = pd.DataFrame(rows)
-    st.dataframe(
-        df,
-        use_container_width=True,
-        hide_index=True,
-        column_config={
-            "Schätzwert": st.column_config.NumberColumn(format="%.0f €"),
-        },
-    )
-
-    if st.button("Ausgewählten Bedarf im Assistenten öffnen", type="primary"):
-        st.session_state._force_nav = "Sourcing-Assistent"
-        # Streamlit radio can't be set easily; guide user via message
-        st.info("Bitte links auf **Sourcing-Assistent** wechseln – der aktive Bedarf ist bereits gesetzt.")
-
-
-# ===========================================================================
 # PAGE: Sourcing-Assistent
 # ===========================================================================
-elif nav == "Sourcing-Assistent":
+if nav == "Sourcing-Assistent":
     req = get_request()
     if req is None:
         st.error("Kein Bedarf ausgewählt.")
@@ -420,7 +320,7 @@ elif nav == "Sourcing-Assistent":
 
         for i, match in enumerate(req.matches):
             s = match.supplier
-            cols = st.columns((0.08, 1.2, 0.5, 0.5, 0.4))
+            cols = st.columns((0.08, 1.4, 0.5, 0.5))
             with cols[0]:
                 selected = st.checkbox(
                     "Sel",
@@ -436,8 +336,6 @@ elif nav == "Sourcing-Assistent":
                 st.metric("Score", f"{match.score:.0f}")
             with cols[3]:
                 st.metric("Rating", f"{s.rating}/5")
-            with cols[4]:
-                st.metric("Aufträge", s.past_orders)
 
         selected_count = sum(1 for m in req.matches if m.selected)
         if selected_count < 2:
@@ -461,22 +359,22 @@ elif nav == "Sourcing-Assistent":
                 st.session_state.wizard_step = 2
                 st.rerun()
 
-    # ---- Step 2: Anfragen freigeben (HITL) ----
+    # ---- Step 2: Anfragen freigeben (HITL, optional) ----
     elif step == 2:
         st.markdown(
-            '<div class="hitl-banner"><b>Human-in-the-Loop:</b> Der Agent versendet '
-            "keine E-Mails selbstständig. Prüfen, ggf. anpassen und erst dann freigeben. "
-            "Perspektivisch kann diese Stufe vollautomatisiert werden.</div>",
+            '<div class="hitl-banner"><b>Optionale Freigabe:</b> Entwürfe prüfen und '
+            "anpassen – oder die Freigabe überspringen und direkt senden. "
+            "Der Agent versendet standardmäßig erst nach Ihrer Entscheidung.</div>",
             unsafe_allow_html=True,
         )
 
         if not req.emails:
             req.emails = compose_outreach_emails(req, req.matches)
 
-        for i, email in enumerate(req.emails):
+        for email in req.emails:
             with st.expander(
-                f"{'✅' if email.approved else '📝'} {email.supplier_name} → {email.to_address}",
-                expanded=not email.approved,
+                f"{email.supplier_name} → {email.to_address}",
+                expanded=True,
             ):
                 email.subject = st.text_input(
                     "Betreff",
@@ -486,47 +384,40 @@ elif nav == "Sourcing-Assistent":
                 email.body = st.text_area(
                     "Nachricht",
                     value=email.body,
-                    height=260,
+                    height=220,
                     key=f"body_{req.id}_{email.supplier_id}",
                 )
-                a1, a2 = st.columns(2)
-                with a1:
-                    if st.button(
-                        "Freigeben",
-                        key=f"approve_{req.id}_{email.supplier_id}",
-                        type="primary",
-                    ):
-                        email.approved = True
-                        log_activity(req, f"E-Mail an {email.supplier_name} freigegeben.")
-                        st.rerun()
-                with a2:
-                    if email.approved:
-                        st.success("Freigegeben – bereit zum Versand")
 
-        all_approved = bool(req.emails) and all(e.approved for e in req.emails)
         st.markdown("---")
-        b1, b2, b3 = st.columns((1, 1, 2))
+        b1, b2, b3 = st.columns(3)
         with b1:
             if st.button("Zurück", key="back_step2"):
                 st.session_state.wizard_step = 1
                 st.rerun()
         with b2:
             if st.button(
-                "Alle freigeben & senden",
+                "Freigeben & senden",
                 type="primary",
                 disabled=not req.emails,
+                key="approve_send",
             ):
                 for e in req.emails:
                     e.approved = True
                     e.sent = True
+                log_activity(req, "Anfragen freigegeben und gesendet.")
                 advance_after_send(req)
                 st.session_state.wizard_step = 3
                 st.rerun()
         with b3:
-            if all_approved and st.button("Freigegebene senden"):
+            if st.button(
+                "Freigabe überspringen & senden",
+                disabled=not req.emails,
+                key="skip_approve_send",
+            ):
                 for e in req.emails:
-                    if e.approved:
-                        e.sent = True
+                    e.approved = False
+                    e.sent = True
+                log_activity(req, "Freigabe übersprungen – Anfragen direkt gesendet.")
                 advance_after_send(req)
                 st.session_state.wizard_step = 3
                 st.rerun()
