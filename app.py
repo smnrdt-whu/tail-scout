@@ -346,8 +346,7 @@ def render_ticket_inbox() -> None:
     st.subheader("Oder vorhandenes Ticket wählen")
     st.markdown(
         '<div class="agent-banner">Beispiel-Bedarfe für die Demo. Mit der Auswahl '
-        "übernimmt der Agent die Vergleichsangebote – ohne Extraaufwand für den "
-        "Einkauf.</div>",
+        "übernimmt der Agent die Vergleichsangebote.</div>",
         unsafe_allow_html=True,
     )
 
@@ -356,7 +355,6 @@ def render_ticket_inbox() -> None:
         row = requests[row_start : row_start + 3]
         cols = st.columns(len(row))
         for col, req in zip(cols, row):
-            urgency_cls = req.urgency.lower().replace(" ", "-")
             with col:
                 st.markdown(
                     f"""
@@ -369,8 +367,6 @@ def render_ticket_inbox() -> None:
                         Benötigt bis: {req.needed_by}
                       </div>
                       <div class="ticket-value">{fmt_eur(req.estimated_value_eur)}</div>
-                      <span class="ticket-urgency {urgency_cls}">{req.urgency}</span>
-                      · {STATUS_LABELS_DE[req.status]}
                     </div>
                     """,
                     unsafe_allow_html=True,
